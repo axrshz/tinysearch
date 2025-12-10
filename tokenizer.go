@@ -59,3 +59,82 @@ func (t WordTokenizer) Tokenize(text string) []Token {
 
 	return tokens
 }
+
+// PrefixTokenizer generates the beginning parts of words.
+type PrefixTokenizer struct {
+	Weight    int
+	MinLength int // Don't index prefixes shorter than this (e.g. "a", "ap")
+}
+
+func (t PrefixTokenizer) Tokenize(text string) []Token {
+	cleanText := normalize(text)
+	words := strings.Fields(cleanText)
+	
+	var tokens []Token
+	seen := make(map[string]bool)
+
+	for _, word := range words {
+		// Crucial Step: Convert string to 'runes'.
+		// In Go, strings are bytes. 'Runes' are actual characters.
+		// If we don't do this, we might cut an emoji or accent mark in half!
+		chars := []rune(word)
+		
+		if len(chars) < t.MinLength {
+			continue
+		}
+
+		// Loop: create prefixes from MinLength up to the full word
+		for i := t.MinLength; i <= len(chars); i++ {
+			prefix := string(chars[:i])
+			
+			if !seen[prefix] {
+				tokens = append(tokens, Token{
+					Name:   prefix,
+					Weight: t.Weight,
+				})
+				seen[prefix] = true
+			}
+		}
+	}
+	return tokens
+}
+
+// NGramTokenizer creates sliding windows of characters.
+type NGramTokenizer struct {
+	Weight int
+	Length int // The size of the window (usually 3)
+}
+
+func (t NGramTokenizer) Tokenize(text string) []Token {
+	cleanText := normalize(text)
+	words := strings.Fields(cleanText)
+	
+	var tokens []Token
+	seen := make(map[string]bool)
+
+	for _, word := range words {
+		chars := []rune(word)
+		
+		if len(chars) < t.Length {
+			continue
+		}
+
+		// Slide the window across the word
+		// If word is "Apple" (5 chars) and Length is 3:
+		// i=0: "App"
+		// i=1: "ppl"
+		// i=2: "ple"
+		for i := 0; i <= len(chars)-t.Length; i++ {
+			gram := string(chars[i : i+t.Length])
+			
+			if !seen[gram] {
+				tokens = append(tokens, Token{
+					Name:   gram,
+					Weight: t.Weight,
+				})
+				seen[gram] = true
+			}
+		}
+	}
+	return tokens
+}
